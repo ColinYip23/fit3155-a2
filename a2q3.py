@@ -160,116 +160,153 @@ class SuffixTree:
             l = max(1, (i - self.remainder + 2))
             r = max(l, i + 1)
             rem = f"S[{l}...{r}]"
-        return f"Active Node = Node {active_id} (suffix link to Node {sl_id}); Remainder = {rem}"
+        return f"    Active Node = Node {active_id} (suffix link to Node {sl_id}); Remainder = {rem}"
 
     def build(self):
         """
         Core Ukkonen loop: phases i = 0..N-1 (processing text[i]).
         We log:
-          - Phase starts from Extn j
-          - For each explicit extension, which rule applied
-          - Node creations
-          - Suffix link resolutions
-          - Active state after each extension
+        - Phase starts from Extn j
+        - For each explicit extension, which rule applied
+        - Node creations
+        - Suffix link resolutions
+        - Active state *after* each extension (post remainder/active-point update),
+            except Rule 3 where we show EMPTY because the phase ends.
         """
         for i in range(self.N):
-            # Start of a new phase (i is 0-based; phase number is i+1)
+            # ---- Phase start
             phase_num = i + 1
             self.leaf_end.val = i
             self.remainder += 1
             self.last_new_internal = None
 
-            # Heuristic “start extension number” in logs: phase - remainder + 1 (1-based)
+            # "Phase k starts from Extn j"
             start_extn = phase_num - self.remainder + 1
             if start_extn < 1:
                 start_extn = 1
-            self.logger.log(f"Phase {phase_num} starts from Extn {start_extn}")
+            self.logger.log(f"\nPhase {phase_num} starts from Extn {start_extn}")
 
-            # Keep adding suffixes until remainder is 0
+            # ---- Extensions loop
             while self.remainder > 0:
                 if self.active_length == 0:
                     self.active_edge_char = self.text[i]
 
-                # If there is no outgoing edge with active_edge_char -> Rule 2 (alternate): create leaf
                 if self.active_edge_char not in self.active_node.children:
-                    # Create a new leaf edge from active_node with label [i..leaf_end]
+                    # =========================
+                    # Rule 2 (alternate): create a fresh leaf
+                    # =========================
+                    # Log the rule first (like the reference)
+                    self.logger.log(f"    Extn {phase_num} applies Rule 2 (alternate)")
+
+                    # Do the structural change now (but delay node-creation log lines until after active update)
                     leaf = self._new_node(internal=False, start=i, end=self.leaf_end)
                     self.active_node.children[self.active_edge_char] = leaf
-                    self.logger.log(" " * 0 + f"Extn {phase_num} applies Rule 2 (alternate)")
-                    self.logger.log(self._active_info_str())
-                    self.logger.log(f"Node {leaf.id} created: Leaf node!")
 
-                    # If there was a freshly created internal node in this phase, link it to active_node
+                    # Resolve pending internal suffix-link to current active_node (structurally),
+                    # but delay logging the link until after we print the Active Node line.
+                    pending_link_target = None
                     if self.last_new_internal is not None:
                         self.last_new_internal.suffix_link = self.active_node
-                        self.logger.log(f"Linking Node {self.last_new_internal.id} to Node {self.active_node.id}")
+                        pending_link_target = self.last_new_internal
                         self.last_new_internal = None
 
+                    # Finish this extension:
+                    self.remainder -= 1
+
+                    # Update active point (root trick or suffix link) BEFORE printing Active Node line
+                    if self.active_node is self.root and self.active_length > 0:
+                        self.active_length -= 1
+                        start_index = i - self.remainder + 1
+                        if start_index < self.N:
+                            self.active_edge_char = self.text[start_index]
+                    else:
+                        self.active_node = self.active_node.suffix_link if self.active_node.suffix_link is not None else self.root
+
+                    # Now log the post-update active state (this is what makes early phases show EMPTY)
+                    self.logger.log(self._active_info_str())
+
+                    # Then log node creation(s) and any link
+                    self.logger.log(f"        Node {leaf.id} created: Leaf node!")
+                    if pending_link_target is not None:
+                        self.logger.log(f"        Linking Node {pending_link_target.id} to Node {self.active_node.id if self.active_node else self.root.id}")
+
                 else:
-                    # There is an outgoing edge; try to walk down or split
+                    # There is an outgoing edge; maybe walk down or split
                     next_node = self.active_node.children[self.active_edge_char]
                     if self._walk_down(next_node):
-                        # Walk-down happened; continue this extension without consuming remainder
+                        # Walk-down consumes edge and continues this same extension
                         continue
 
-                    # Check the next character on the edge
                     edge_pos = next_node.start + self.active_length
                     if self.text[edge_pos] == self.text[i]:
-                        # Rule 3: Character already on edge; just increment active_length; stop phase
+                        # =========================
+                        # Rule 3: character already on edge → extend and end phase
+                        # =========================
                         self.active_length += 1
-                        self.logger.log(f"Extn {phase_num} applies Rule 3")
-                        self.logger.log(self._active_info_str())
-                        # Link any pending internal node to active_node
+                        self.logger.log(f"    Extn {phase_num} applies Rule 3")
+
+                        # For the reference log, print EMPTY because the phase ends here.
+                        # (They treat Rule 3 as ending all pending work for this phase.)
+                        self.logger.log(f"    Active Node = Node {self.active_node.id} (suffix link to Node {self.active_node.suffix_link.id if self.active_node.suffix_link else 1}); Remainder = EMPTY")
+
+                        # If there was a pending internal from earlier in this phase, link it now
                         if self.last_new_internal is not None and self.active_node is not self.root:
                             self.last_new_internal.suffix_link = self.active_node
-                            self.logger.log(f"Linking Node {self.last_new_internal.id} to Node {self.active_node.id}")
+                            self.logger.log(f"        Linking Node {self.last_new_internal.id} to Node {self.active_node.id}")
                             self.last_new_internal = None
-                        break  # implicit extension termination
+                        break  # implicit termination of this phase
                     else:
-                        # Rule 2 (regular): Split edge, create internal + leaf
-                        # Create an internal node at edge_pos - 1
+                        # =========================
+                        # Rule 2 (regular): split edge, create internal + leaf
+                        # =========================
+                        self.logger.log(f"    Extn {phase_num} applies Rule 2 (regular)")
+
+                        # Perform the split (delay "Node created" logs until after active update)
                         split = self._new_node(internal=True, start=next_node.start, end=edge_pos - 1)
                         self.active_node.children[self.active_edge_char] = split
-                        self.logger.log(f"Extn {phase_num} applies Rule 2 (regular)")
-                        self.logger.log(self._active_info_str())
-                        self.logger.log(f"Node {split.id} created: Internal node!")
 
-                        # New leaf from split with label [i..leaf_end]
                         leaf = self._new_node(internal=False, start=i, end=self.leaf_end)
-                        self.logger.log(f"Node {leaf.id} created: Leaf node!")
 
-                        # Adjust next_node to start at edge_pos
+                        # Rewire next_node to start at edge_pos; attach both children to split
                         next_node.start = edge_pos
-                        # Reconnect children
                         split.children[self.text[edge_pos]] = next_node
                         split.children[self.text[i]] = leaf
 
-                        # Suffix link resolution for previously created internal (from this phase)
+                        # If there was a previously created internal in this phase, link it to split (structurally).
+                        pending_link_from = None
                         if self.last_new_internal is not None:
                             self.last_new_internal.suffix_link = split
-                            self.logger.log(f"Linking Node {self.last_new_internal.id} to Node {split.id}")
+                            pending_link_from = self.last_new_internal
+                        # Now mark current split as the "last_new_internal" (may be linked later)
                         self.last_new_internal = split
 
-                # One suffix finished
-                self.remainder -= 1
+                        # Finish this extension:
+                        self.remainder -= 1
 
-                if self.active_node is self.root and self.active_length > 0:
-                    # Rule for root: decrement active_length and shift active_edge
-                    self.active_length -= 1
-                    # Move active_edge_char one step forward to reflect the next suffix
-                    start_index = i - self.remainder + 1  # 0-based
-                    if start_index < self.N:
-                        self.active_edge_char = self.text[start_index]
-                else:
-                    # Follow suffix link if possible
-                    self.active_node = self.active_node.suffix_link if self.active_node.suffix_link is not None else self.root
+                        # Update active point before printing "Active Node..." line
+                        if self.active_node is self.root and self.active_length > 0:
+                            self.active_length -= 1
+                            start_index = i - self.remainder + 1
+                            if start_index < self.N:
+                                self.active_edge_char = self.text[start_index]
+                        else:
+                            self.active_node = self.active_node.suffix_link if self.active_node.suffix_link is not None else self.root
 
-            # If after phase ends we still have last_new_internal pending, link it to root
+                        # Now log the post-update active state line
+                        self.logger.log(self._active_info_str())
+
+                        # Then log node creations and any link resolution (to match ordering in reference logs)
+                        self.logger.log(f"        Node {split.id} created: Internal node!")
+                        self.logger.log(f"        Node {leaf.id} created: Leaf node!")
+                        if pending_link_from is not None:
+                            self.logger.log(f"        Linking Node {pending_link_from.id} to Node {split.id}")
+
+            # After a phase ends, if an internal is still pending, link it to root (as per Ukkonen)
             if self.last_new_internal is not None:
-                # As per standard Ukkonen, if not yet linked, link to root.
                 self.last_new_internal.suffix_link = self.root
-                self.logger.log(f"Linking Node {self.last_new_internal.id} to Node {self.root.id}")
+                self.logger.log(f"        Linking Node {self.last_new_internal.id} to Node {self.root.id}")
                 self.last_new_internal = None
+
 
     # -----------------------------
     # Derive suffix array via DFS
@@ -321,9 +358,8 @@ def main():
         print("Error: input string must be non-empty.")
         sys.exit(1)
 
-    # Per spec: immediately append unique terminal symbol '$'
     # ($ is ASCII 36; input guaranteed to be in [37..126], so '$' is unique)
-    text = s + "$"
+    text = s
 
     logger = RunLogger()
     # Build the suffix tree with Ukkonen
