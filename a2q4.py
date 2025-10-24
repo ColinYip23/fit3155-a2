@@ -5,23 +5,16 @@ a2q4.py
 Compressed encoding of a suffix tree.
 
 This program encodes both:
-  (I)  The Burrows–Wheeler Transform (BWT) of the input string
+  (I)  The Burrows-Wheeler Transform (BWT) of the input string
   (II) The suffix tree structure
 
-using Fibonacci integer coding (from a2q2.py) and Huffman coding.
-
-Unlike the sequential mode, this version **imports a2q3.py**
-to construct the suffix tree directly in memory (not via files),
-so each question can be marked independently.
+using Fibonacci integer coding (from a2q2.py), suffix tree (from a2q3.py) and Huffman coding.
 
 Command line:
     python a2q4.py <input filename>
 
 Output:
-    output_a2q4_bits.txt  — human-readable binary encoding for debugging
-    (You can also uncomment binary output to write output_a2q4.bin)
-
-Author: (your name / student id)
+    output_a2q4_bin  — binary encoding of the bwt of the input string and suffix tree
 """
 
 import sys
@@ -38,7 +31,7 @@ from a2q3 import SuffixTree, EndRef, Node as STNode
 # ==============================================================
 
 def bwt_from_sa(s: str, sa: List[int]) -> str:
-    """Compute the Burrows–Wheeler Transform given S and its 1-based suffix array."""
+    """Compute the Burrows-Wheeler Transform given S and its 1-based suffix array."""
     n = len(s)
     return ''.join(s[-1] if i == 1 else s[i - 2] for i in sa)
 
@@ -97,7 +90,6 @@ def build_huffman_codes(text: str) -> Dict[str, str]:
         traverse(node.right, prefix + "1")
 
     traverse(root, "")
-    print("Huffman Codes:", codes)
     return codes
 
 
@@ -126,7 +118,7 @@ def encode_part_I_bwt(s: str, sa: List[int]) -> str:
     bits.append(fibonacci_encode(len(distinct)))         # (b) #distinct
 
     codes = build_huffman_codes(bwt)
-    for ch in distinct:                                  # (c) dictionary
+    for ch in distinct:                                  # (c) 7 bit ascii + code
         ascii7 = format(ord(ch), "07b")
         code = codes[ch]
         bits.append(ascii7)
@@ -171,31 +163,31 @@ def encode_part_II_from_q3_tree(s: str, st: SuffixTree) -> str:
             start, end = rng
 
             # --- DOWN ---
-            print(f"{prefix}At INTERNAL node with untraversed edges: traverse DOWN along the untraversed edge with label ({start},{end})")
+
             bits.append("0")
             bits.append(fibonacci_encode(start))
             bits.append(fibonacci_encode(end))
-            print(f"{prefix}Codeword(DOWN) = 0 FibonacciCodeword({start}) = {fibonacci_encode(start)} FibonacciCodeword({end}) = {fibonacci_encode(end)}")
+
 
             if not child.children:
                 # --- LEAF UP ---
                 path_len = end - (child.start + 1) + 1
                 suffix_index = st.N - (depth + path_len) + 1
-                print(f"{prefix}Reached LEAF node with label/suffix index {suffix_index}. Hence climb back UP; also encode suffix index")
+
                 bits.append("1")
                 bits.append(fibonacci_encode(suffix_index))
-                print(f"{prefix}Codeword(UP) = 1 FibonacciCodeword({suffix_index}) = {fibonacci_encode(suffix_index)}")
+
             else:
                 # --- INTERNAL subtree ---
                 dfs(child, depth + (end - start + 1))
-                print(f"{prefix}At INTERNAL node but all edges already traversed. Hence climb UP")
+
                 bits.append("1")
-                print(f"{prefix}Codeword(UP) = 1")
+
 
     dfs(st.root)
-    print("At root node — all edges traversed. Hence climb UP (final)")
+
     bits.append("1")
-    print("Codeword(UP) = 1 (final from root)")
+
 
     return "".join(bits)
 
@@ -244,18 +236,13 @@ def main():
     # === Combine both ===
     full_bits = part1_bits + part2_bits
 
-    # --- DEBUG OUTPUT ---
-    print("==== ENCODED BITSTREAM (debug) ====")
-    print(full_bits)
-    print(f"\nTotal bits: {len(full_bits)}")
 
     with open("output_a2q4_bits.txt", "w", encoding="utf-8") as f:
         f.write(full_bits + "\n")
         f.write(f"(Total bits: {len(full_bits)})\n")
 
-    # Optional binary output
-    # write_bits_to_bin(full_bits, "output_a2q4.bin")
-    # print("Binary encoding written to output_a2q4.bin")
+    write_bits_to_bin(full_bits, "output_a2q4.bin")
+    print("Binary encoding written to output_a2q4.bin")
 
 
 if __name__ == "__main__":
