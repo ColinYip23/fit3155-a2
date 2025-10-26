@@ -21,8 +21,8 @@ import sys
 import heapq
 from typing import List, Tuple, Dict, Optional
 
-from a2q2 import fibonacci_encode
-from a2q3 import SuffixTree, EndRef, Node as STNode
+from q2.a2q2 import fibonacci_encode
+from q3.a2q3 import SuffixTree, EndRef, Node as STNode
 
 
 # PART I — BWT + Huffman + RLE
