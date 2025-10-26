@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """
 a2q3.py
---------
 Construct a suffix tree for a given ASCII string (characters in [37..126]) using
 Ukkonen's algorithm (linear time/space), then output the suffix array derived
 from the suffix tree.
@@ -20,20 +19,15 @@ Spec:
   * "Active Node = Node A (suffix link to Node B); Remainder = S[l...r]" or EMPTY
   * "Linking Node p to Node q" when we resolve an internal node's suffix link.
 Notes:
-- We use 1-based indices in logs (to match assignment format).
+- We use 1-based indices in logs.
 - Node IDs are assigned in creation order; Node 1 is the root.
-
-Author: (your name / id)
 """
 
 import sys
 from typing import Dict, Optional, List, Tuple
 
 
-# -----------------------------
 # Utilities for run logging
-# -----------------------------
-
 class RunLogger:
     """Collects run-log lines and writes them at the end."""
     def __init__(self):
@@ -49,10 +43,7 @@ class RunLogger:
                 f.write("\n")
 
 
-# -----------------------------
 # Suffix tree structures
-# -----------------------------
-
 class EndRef:
     """A small mutable wrapper so all leaf edges share the same changing end."""
     def __init__(self, val: int):
@@ -65,7 +56,7 @@ class Node:
     - start, end: indices of the edge label in the global text; for internal nodes,
       start=-1, end=-1 (no incoming edge from parent, conceptually).
     - end can be EndRef (for leaves) or an integer (for internals/split edges).
-    - suffix_link: link to another internal node (root’s link points to itself).
+    - suffix_link: link to another internal node (root's link points to itself).
     - id: creation index (root is id=1).
     """
     __slots__ = ("children", "suffix_link", "start", "end", "id")
@@ -78,10 +69,7 @@ class Node:
         self.id = node_id
 
 
-# -----------------------------
 # Ukkonen's algorithm
-# -----------------------------
-
 class SuffixTree:
     """
     Ukkonen suffix tree for a single string. After construction, we can DFS to
@@ -116,7 +104,7 @@ class SuffixTree:
         node = Node(self.next_id, start, end)
         self.next_id += 1
         if internal:
-            # For an internal node, end is int (fixed)
+            # For an internal node, end is int 
             pass
         return node
 
@@ -152,10 +140,6 @@ class SuffixTree:
         if self.remainder <= 0:
             rem = "EMPTY"
         else:
-            # Best-effort 1-based remainder interval in current phase:
-            # In phase (i+1), with current position i (0-based), remainder r,
-            # the pending substring typically spans S[i-r+2 ... i+1] in 1-based indexing.
-            # Clamp bounds to [1..N].
             i = self.leaf_end.val
             l = max(1, (i - self.remainder + 2))
             r = max(l, i + 1)
@@ -174,7 +158,7 @@ class SuffixTree:
             except Rule 3 where we show EMPTY because the phase ends.
         """
         for i in range(self.N):
-            # ---- Phase start
+            # Phase start
             phase_num = i + 1
             self.leaf_end.val = i
             self.remainder += 1
@@ -186,15 +170,13 @@ class SuffixTree:
                 start_extn = 1
             self.logger.log(f"\nPhase {phase_num} starts from Extn {start_extn}")
 
-            # ---- Extensions loop
+            # Extensions loop
             while self.remainder > 0:
                 if self.active_length == 0:
                     self.active_edge_char = self.text[i]
 
                 if self.active_edge_char not in self.active_node.children:
-                    # =========================
                     # Rule 2 (alternate): create a fresh leaf
-                    # =========================
                     # Log the rule first (like the reference)
                     self.logger.log(f"    Extn {phase_num} applies Rule 2 (alternate)")
 
@@ -202,8 +184,7 @@ class SuffixTree:
                     leaf = self._new_node(internal=False, start=i, end=self.leaf_end)
                     self.active_node.children[self.active_edge_char] = leaf
 
-                    # Resolve pending internal suffix-link to current active_node (structurally),
-                    # but delay logging the link until after we print the Active Node line.
+                    # Resolve pending internal suffix-link to current active_node (structurally)
                     pending_link_target = None
                     if self.last_new_internal is not None:
                         self.last_new_internal.suffix_link = self.active_node
@@ -225,13 +206,13 @@ class SuffixTree:
                     # Now log the post-update active state (this is what makes early phases show EMPTY)
                     self.logger.log(self._active_info_str())
 
-                    # Then log node creation(s) and any link
+                    # Then log node creation and any link
                     self.logger.log(f"        Node {leaf.id} created: Leaf node!")
                     if pending_link_target is not None:
                         self.logger.log(f"        Linking Node {pending_link_target.id} to Node {self.active_node.id if self.active_node else self.root.id}")
 
                 else:
-                    # There is an outgoing edge; maybe walk down or split
+                    # There is an outgoing edge, maybe walk down or split
                     next_node = self.active_node.children[self.active_edge_char]
                     if self._walk_down(next_node):
                         # Walk-down consumes edge and continues this same extension
@@ -239,14 +220,11 @@ class SuffixTree:
 
                     edge_pos = next_node.start + self.active_length
                     if self.text[edge_pos] == self.text[i]:
-                        # =========================
                         # Rule 3: character already on edge → extend and end phase
-                        # =========================
                         self.active_length += 1
                         self.logger.log(f"    Extn {phase_num} applies Rule 3")
 
                         # For the reference log, print EMPTY because the phase ends here.
-                        # (They treat Rule 3 as ending all pending work for this phase.)
                         self.logger.log(f"    Active Node = Node {self.active_node.id} (suffix link to Node {self.active_node.suffix_link.id if self.active_node.suffix_link else 1}); Remainder = EMPTY")
 
                         # If there was a pending internal from earlier in this phase, link it now
@@ -256,9 +234,7 @@ class SuffixTree:
                             self.last_new_internal = None
                         break  # implicit termination of this phase
                     else:
-                        # =========================
                         # Rule 2 (regular): split edge, create internal + leaf
-                        # =========================
                         self.logger.log(f"    Extn {phase_num} applies Rule 2 (regular)")
 
                         # Perform the split (delay "Node created" logs until after active update)
@@ -301,7 +277,7 @@ class SuffixTree:
                         if pending_link_from is not None:
                             self.logger.log(f"        Linking Node {pending_link_from.id} to Node {split.id}")
 
-            # After a phase ends, if an internal is still pending, link it to root (as per Ukkonen)
+            # After a phase ends, if an internal is still pending, link it to root
             if self.last_new_internal is not None:
                 self.last_new_internal.suffix_link = self.root
                 self.logger.log(f"        Linking Node {self.last_new_internal.id} to Node {self.root.id}")

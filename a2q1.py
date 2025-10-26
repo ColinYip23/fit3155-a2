@@ -1,9 +1,8 @@
 import random
 import sys
 
-# ===============================================================
+
 # Modular exponentiation using repeated squaring
-# ===============================================================
 def mod_exp(base, exponent, modulus):
     """
     Compute (base^exponent) % modulus efficiently using repeated squaring.
@@ -30,9 +29,7 @@ def mod_exp(base, exponent, modulus):
     return result
 
 
-# ===============================================================
 # Miller-Rabin primality test
-# ===============================================================
 def is_probable_prime(n, k=20):
     """
     Miller-Rabin probabilistic primality test.
@@ -62,7 +59,7 @@ def is_probable_prime(n, k=20):
 
     # Perform k rounds of testing
     for _ in range(k):
-        a = random.randrange(2, n - 2)  # random base a ∈ [2, n−2]
+        a = random.randrange(2, n - 2)  # random base a in between 2 and n−2
         x = mod_exp(a, d, n)  # compute a^d mod n using repeated squaring
 
         if x == 1 or x == n - 1:
@@ -79,9 +76,7 @@ def is_probable_prime(n, k=20):
     return True  # Probably prime
 
 
-# ===============================================================
 # Generate a random d-digit prime number
-# ===============================================================
 def generate_d_digit_prime(d):
     """
     Generate a random prime number with exactly d digits.
@@ -108,9 +103,7 @@ def generate_d_digit_prime(d):
             return candidate
 
 
-# ===============================================================
 # Main execution
-# ===============================================================
 def main():
     """
     Main function:

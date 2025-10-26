@@ -21,15 +21,11 @@ import sys
 import heapq
 from typing import List, Tuple, Dict, Optional
 
-# --- Import Fibonacci encoder (Q2) and SuffixTree (Q3)
 from a2q2 import fibonacci_encode
 from a2q3 import SuffixTree, EndRef, Node as STNode
 
 
-# ==============================================================
 # PART I — BWT + Huffman + RLE
-# ==============================================================
-
 def bwt_from_sa(s: str, sa: List[int]) -> str:
     """Compute the Burrows-Wheeler Transform given S and its 1-based suffix array."""
     n = len(s)
@@ -43,9 +39,9 @@ class DummyLogger:
 
 def build_huffman_codes(text: str) -> Dict[str, str]:
     """
-    Build deterministic Huffman codes identical to FIT3155 examples.
-    - Lower frequency → left (0), higher → right (1)
-    - Ties → lexicographically smaller symbol first
+    Build deterministic Huffman codes 
+    - Lower frequency = left (0), higher = right (1)
+    - Ties then lexicographically smaller symbol first
     """
     freq: Dict[str, int] = {}
     for ch in text:
@@ -132,15 +128,11 @@ def encode_part_I_bwt(s: str, sa: List[int]) -> str:
     return "".join(bits)
 
 
-# ==============================================================
 # PART II — Encode suffix tree directly from a2q3
-# ==============================================================
-
 def encode_part_II_from_q3_tree(s: str, st: SuffixTree) -> str:
     """
     Encode the suffix tree directly (using the structure from a2q3).
     Traverses recursively in lexicographic order of edge labels.
-    Prints detailed logs for DOWN/UP actions.
     """
     bits: List[str] = []
 
@@ -162,15 +154,14 @@ def encode_part_II_from_q3_tree(s: str, st: SuffixTree) -> str:
                 continue
             start, end = rng
 
-            # --- DOWN ---
-
+            # DOWN
             bits.append("0")
             bits.append(fibonacci_encode(start))
             bits.append(fibonacci_encode(end))
 
 
             if not child.children:
-                # --- LEAF UP ---
+                # LEAF UP
                 path_len = end - (child.start + 1) + 1
                 suffix_index = st.N - (depth + path_len) + 1
 
@@ -178,7 +169,7 @@ def encode_part_II_from_q3_tree(s: str, st: SuffixTree) -> str:
                 bits.append(fibonacci_encode(suffix_index))
 
             else:
-                # --- INTERNAL subtree ---
+                # INTERNAL subtree
                 dfs(child, depth + (end - start + 1))
 
                 bits.append("1")
@@ -192,10 +183,7 @@ def encode_part_II_from_q3_tree(s: str, st: SuffixTree) -> str:
     return "".join(bits)
 
 
-# ==============================================================
 # Bit-packing utility
-# ==============================================================
-
 def write_bits_to_bin(bitstring: str, filename: str) -> None:
     """Write a bitstring to a binary file, padding to byte boundary."""
     pad = (8 - len(bitstring) % 8) % 8
@@ -204,10 +192,6 @@ def write_bits_to_bin(bitstring: str, filename: str) -> None:
     with open(filename, "wb") as f:
         f.write(data)
 
-
-# ==============================================================
-# Main
-# ==============================================================
 
 def main():
     if len(sys.argv) != 2:
@@ -222,18 +206,18 @@ def main():
     if not S.endswith("$"):
         S += "$"
 
-    # === Build suffix tree directly from a2q3 ===
+    # Build suffix tree
     st = SuffixTree(S, logger=DummyLogger())
     st.build()
     sa = st.suffix_array()  # use suffix array from the same tree
 
-    # === Encode Part I (BWT) ===
+    # encode Part I (BWT)
     part1_bits = encode_part_I_bwt(S, sa)
 
-    # === Encode Part II (suffix tree structure) ===
+    # encode Part II (suffix tree structure)
     part2_bits = encode_part_II_from_q3_tree(S, st)
 
-    # === Combine both ===
+    # concatenate both parts
     full_bits = part1_bits + part2_bits
 
 
